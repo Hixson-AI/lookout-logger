@@ -1,5 +1,5 @@
 {
-  "name": "@lookout/logger",
+  "name": "@hixson-ai/logger",
   "version": "1.0.0",
   "description": "Shared JSON-line structured logger for Lookout platform services with optional OTLP log exporter",
   "type": "module",
