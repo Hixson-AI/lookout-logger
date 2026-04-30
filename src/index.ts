@@ -17,7 +17,7 @@ interface LogEntry {
   message: string;
   timestamp: string;
   context: LogContext;
-  error?: {
+  error?: string | {
     message: string;
     stack?: string;
   };
@@ -72,17 +72,24 @@ class Logger {
     }
 
     const allContext = { ...this.context, ...context, service: this.serviceName };
-    const errorContext = error instanceof Error
-      ? { error: error.message, stack: error.stack }
-      : error ? { error } : undefined;
-
-    const entry: LogEntry = {
+    
+    let entry: LogEntry = {
       level,
       message,
       timestamp: new Date().toISOString(),
       context: allContext,
-      ...errorContext
     };
+
+    if (error) {
+      if (error instanceof Error) {
+        entry.error = {
+          message: error.message,
+          stack: error.stack,
+        };
+      } else {
+        entry.error = String(error);
+      }
+    }
 
     // JSON-line output to stdout
     console.log(JSON.stringify(entry));
