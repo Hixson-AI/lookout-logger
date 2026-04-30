@@ -1,0 +1,50 @@
+{
+  "name": "@lookout/logger",
+  "version": "0.1.0",
+  "description": "Shared JSON-line structured logger for Lookout platform services with optional OTLP log exporter",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo \"Tests not yet implemented\"",
+    "lint": "eslint src",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "logging",
+    "structured-logging",
+    "opentelemetry",
+    "otlp",
+    "lookout"
+  ],
+  "author": "Hixson AI",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "eslint": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0"
+  },
+  "dependencies": {
+    "@opentelemetry/api-logs": "^0.54.0",
+    "@opentelemetry/sdk-logs": "^0.54.0",
+    "@opentelemetry/resources": "^1.27.0",
+    "@opentelemetry/semantic-conventions": "^1.27.0"
+  },
+  "peerDependencies": {},
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
