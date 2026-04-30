@@ -1,8 +1,10 @@
+import { trace, context as otelContext } from '@opentelemetry/api';
+
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
 export interface LogContext {
   requestId?: string;
-  tenantId?: string;
+  tenantId?: string | 'platform';
   userId?: string;
   email?: string;
   action?: string;
@@ -10,6 +12,11 @@ export interface LogContext {
   duration?: string | number;
   component?: string;
   environment?: string;
+  service?: string;
+  deploymentProfile?: string;
+  version?: string;
+  traceId?: string;
+  spanId?: string;
   [key: string]: unknown;
 }
 
@@ -31,11 +38,29 @@ class Logger {
   private useOtlp: boolean;
 
   constructor(context: LogContext = {}) {
+    // Auto-populate environment context
+    const environment = process.env['NODE_ENV'] || 'production';
+    const component = process.env['LOG_COMPONENT'] || context.component;
+    const service = process.env['OTEL_SERVICE_NAME'] || 'unknown-service';
+    const deploymentProfile = process.env['DEPLOYMENT_PROFILE'] || 'unknown';
+    const version = process.env['GIT_SHA'] || context.version;
+
+    // Wire traceId/spanId from active OTEL context if available
+    const activeSpan = trace.getActiveSpan();
+    const traceId = activeSpan?.spanContext().traceId;
+    const spanId = activeSpan?.spanContext().spanId;
+
     this.context = {
-      environment: process.env['NODE_ENV'] || 'production',
+      environment,
+      component,
+      service,
+      deploymentProfile,
+      version,
+      traceId,
+      spanId,
       ...context,
     };
-    this.serviceName = process.env['OTEL_SERVICE_NAME'] || 'unknown-service';
+    this.serviceName = service;
     this.useOtlp = !!process.env['OTEL_EXPORTER_OTLP_ENDPOINT'];
     this.currentLevel = (process.env['LOG_LEVEL'] as LogLevel) ||
       (process.env['NODE_ENV'] === 'development' ? 'debug' : 'info');
@@ -61,6 +86,47 @@ class Logger {
 
   child(context: LogContext): Logger {
     return new Logger({ ...this.context, ...context });
+  }
+
+  withTenant(tenantId: string | 'platform'): Logger {
+    return this.child({ tenantId });
+  }
+
+  withRequest(req: { headers?: Record<string, string | undefined>; id?: string }): Logger {
+    const requestContext: LogContext = {
+      requestId: req.id,
+    };
+
+    // Extract trace_id from headers (common OpenTelemetry header)
+    if (req.headers) {
+      const traceparent = req.headers['traceparent'] || req.headers['uber-trace-id'];
+      if (traceparent) {
+        requestContext.traceId = traceparent.split('-')[1] || traceparent;
+      }
+      const traceId = req.headers['x-trace-id'];
+      if (traceId) {
+        requestContext.traceId = traceId;
+      }
+    }
+
+    return this.child(requestContext);
+  }
+
+  assertContext(keys: string[]): void {
+    if (process.env['NODE_ENV'] !== 'development' && process.env['NODE_ENV'] !== 'test') {
+      return;
+    }
+
+    const missing: string[] = [];
+    for (const key of keys) {
+      if (this.context[key] === undefined || this.context[key] === null) {
+        missing.push(key);
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(`Missing required log context keys: ${missing.join(', ')}`);
+    }
   }
 
   private shouldLog(level: LogLevel): boolean {
@@ -205,12 +271,27 @@ export function createRequestLogger(req: {
   method?: string;
   path?: string;
   route?: string;
+  headers?: Record<string, string | undefined>;
 }): Logger {
-  return logger.child({
+  const requestContext: LogContext = {
     requestId: req.id,
     ip: req.ip,
     method: req.method,
     path: req.path,
     route: req.route || req.path,
-  });
+  };
+
+  // Extract trace_id from headers
+  if (req.headers) {
+    const traceparent = req.headers['traceparent'] || req.headers['uber-trace-id'];
+    if (traceparent) {
+      requestContext.traceId = traceparent.split('-')[1] || traceparent;
+    }
+    const traceId = req.headers['x-trace-id'];
+    if (traceId) {
+      requestContext.traceId = traceId;
+    }
+  }
+
+  return logger.child(requestContext);
 }
