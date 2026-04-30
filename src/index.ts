@@ -122,9 +122,95 @@ class Logger {
   fatal(message: string, error?: Error | unknown, context: LogContext = {}): void {
     this.writeLog('fatal', message, error, context);
   }
+
+  // Happy path helpers
+  success(message: string, context: LogContext = {}): void {
+    this.info(`✅ ${message}`, context);
+  }
+
+  // Sad path helpers
+  failure(message: string, error?: Error | unknown, context: LogContext = {}): void {
+    this.error(`❌ ${message}`, error, context);
+  }
+
+  // Request lifecycle helpers
+  requestStart(method: string, path: string, context: LogContext = {}): void {
+    this.debug(`${method} ${path} - Request started`, context);
+  }
+
+  requestEnd(method: string, path: string, statusCode: number, context: LogContext = {}): void {
+    const statusEmoji = statusCode < 300 ? '✅' : statusCode < 400 ? '↩️' : statusCode < 500 ? '⚠️' : '❌';
+    this.info(`${statusEmoji} ${method} ${path} - ${statusCode}`, context);
+  }
+
+  // Auth helpers
+  authSuccess(provider: string, email: string, context: LogContext = {}): void {
+    this.success(`Authentication successful via ${provider}`, { email, ...context });
+  }
+
+  authFailure(provider: string, reason: string, context: LogContext = {}): void {
+    this.warn(`Authentication failed via ${provider}: ${reason}`, context);
+  }
+
+  // Database helpers
+  dbQuery(operation: string, table: string, context: LogContext = {}): void {
+    this.debug(`DB Query: ${operation} on ${table}`, context);
+  }
+
+  dbSuccess(operation: string, table: string, context: LogContext = {}): void {
+    this.debug(`DB Success: ${operation} on ${table}`, context);
+  }
+
+  dbError(operation: string, table: string, error: Error | unknown, context: LogContext = {}): void {
+    this.failure(`DB Error: ${operation} on ${table}`, error, context);
+  }
+
+  // Business logic helpers
+  businessEvent(event: string, context: LogContext = {}): void {
+    this.info(`🏢 Business Event: ${event}`, context);
+  }
+
+  securityEvent(event: string, context: LogContext = {}): void {
+    this.warn(`🔒 Security Event: ${event}`, context);
+  }
+
+  // Performance helpers
+  performance(operation: string, duration: number, context: LogContext = {}): void {
+    const level = duration > 1000 ? 'warn' : duration > 100 ? 'info' : 'debug';
+    if (this.shouldLog(level)) {
+      this.writeLog(level, `⚡ Performance: ${operation} completed in ${duration}ms`, undefined, context);
+    }
+  }
+
+  // Set log level at runtime
+  setLevel(level: LogLevel): void {
+    this.currentLevel = level;
+  }
+
+  // Get current log level
+  getLevel(): LogLevel {
+    return this.currentLevel;
+  }
 }
 
 // Default logger instance
 export const logger = new Logger();
 
 export { Logger };
+
+// Helper to create logger with request context
+export function createRequestLogger(req: {
+  id?: string;
+  ip?: string;
+  method?: string;
+  path?: string;
+  route?: string;
+}): Logger {
+  return logger.child({
+    requestId: req.id,
+    ip: req.ip,
+    method: req.method,
+    path: req.path,
+    route: req.route || req.path,
+  });
+}
