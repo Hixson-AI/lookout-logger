@@ -9,6 +9,7 @@ export interface LogContext {
   resource?: string;
   duration?: string | number;
   component?: string;
+  environment?: string;
   [key: string]: unknown;
 }
 
@@ -30,7 +31,10 @@ class Logger {
   private useOtlp: boolean;
 
   constructor(context: LogContext = {}) {
-    this.context = context;
+    this.context = {
+      environment: process.env['NODE_ENV'] || 'production',
+      ...context,
+    };
     this.serviceName = process.env['OTEL_SERVICE_NAME'] || 'unknown-service';
     this.useOtlp = !!process.env['OTEL_EXPORTER_OTLP_ENDPOINT'];
     this.currentLevel = (process.env['LOG_LEVEL'] as LogLevel) ||
